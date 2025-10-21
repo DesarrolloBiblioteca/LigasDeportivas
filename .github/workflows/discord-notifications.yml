@@ -1,5 +1,4 @@
 name: Discord Notifications
-
 on:
   push:
     branches: [ main, develop, feature/**, bugfix/**, hotfix/** ]
@@ -7,7 +6,6 @@ on:
     types: [opened, closed, reopened, ready_for_review]
   issues:
     types: [opened, closed, reopened]
-
 jobs:
   notify-commit:
     if: github.event_name == 'push'
@@ -29,11 +27,42 @@ jobs:
             }]
           }' \
           ${{ secrets.DISCORD_WEBHOOK_COMMITS }}
-
+  
   notify-pr:
     if: github.event_name == 'pull_request'
     runs-on: ubuntu-latest
     steps:
+      - name: Extract Jira Issue Key
+        id: jira_key
+        run: |
+          ISSUE_KEY=$(echo "${{ github.event.pull_request.title }}" | grep -oE 'DES-[0-9]+' || echo "")
+          echo "issue_key=$ISSUE_KEY" >> $GITHUB_OUTPUT
+          if [ -n "$ISSUE_KEY" ]; then
+            echo "✅ Found Jira issue: $ISSUE_KEY"
+          else
+            echo "⚠️ No Jira issue key found in PR title"
+          fi
+
+      - name: Move Jira issue to IN REVIEW
+        if: github.event.action == 'opened' && steps.jira_key.outputs.issue_key != ''
+        run: |
+          echo "Moving ${{ steps.jira_key.outputs.issue_key }} to IN REVIEW..."
+          curl -X POST \
+            -u "${{ secrets.JIRA_EMAIL }}:${{ secrets.JIRA_API_TOKEN }}" \
+            -H "Content-Type: application/json" \
+            -d '{"transition":{"id":"3"}}' \
+            "https://alumnos-team-myphxh4c.atlassian.net/rest/api/3/issue/${{ steps.jira_key.outputs.issue_key }}/transitions"
+
+      - name: Move Jira issue to DONE
+        if: github.event.pull_request.merged == true && steps.jira_key.outputs.issue_key != ''
+        run: |
+          echo "Moving ${{ steps.jira_key.outputs.issue_key }} to DONE..."
+          curl -X POST \
+            -u "${{ secrets.JIRA_EMAIL }}:${{ secrets.JIRA_API_TOKEN }}" \
+            -H "Content-Type: application/json" \
+            -d '{"transition":{"id":"6"}}' \
+            "https://alumnos-team-myphxh4c.atlassian.net/rest/api/3/issue/${{ steps.jira_key.outputs.issue_key }}/transitions"
+
       - name: Notificar PR a Discord
         run: |
           COLOR=15844367
@@ -64,7 +93,7 @@ jobs:
             }]
           }' \
           ${{ secrets.DISCORD_WEBHOOK_PRS }}
-
+  
   notify-issue:
     if: github.event_name == 'issues'
     runs-on: ubuntu-latest
