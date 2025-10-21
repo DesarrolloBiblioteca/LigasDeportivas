@@ -1,49 +1,23 @@
 name: Discord Notifications
 on:
   push:
-    branches: [ '**' ]
+    branches: [ main, develop, feature/**, bugfix/**, hotfix/** ]
   pull_request:
     types: [opened, closed, reopened, ready_for_review]
   issues:
     types: [opened, closed, reopened]
-
 jobs:
   notify-commit:
     if: github.event_name == 'push'
     runs-on: ubuntu-latest
     steps:
-      # --- PASO 1: EXTRAE LA CLAVE DE JIRA DEL COMMIT ---
-      - name: Extract Jira Issue Key from Commit
-        id: jira_key
-        run: |
-          ISSUE_KEY=$(echo "${{ github.event.head_commit.message }}" | grep -oE 'DES-[0-9]+' || echo "")
-          echo "issue_key=$ISSUE_KEY" >> $GITHUB_OUTPUT
-          if [ -n "$ISSUE_KEY" ]; then
-            echo "✅ Found Jira issue: $ISSUE_KEY"
-          else
-            echo "⚠️ No Jira issue key found in commit message"
-          fi
-
-      # --- PASO 2: MUEVE LA TAREA A "IN PROGRESS" ---
-      # (Usa la transition "5" que tú mismo definiste para "IN PROGRESS")
-      - name: Move Jira issue to IN PROGRESS
-        if: steps.jira_key.outputs.issue_key != ''
-        run: |
-          echo "Moving ${{ steps.jira_key.outputs.issue_key }} to IN PROGRESS..."
-          curl -X POST \
-            -u "${{ secrets.JIRA_EMAIL }}:${{ secrets.JIRA_API_TOKEN }}" \
-            -H "Content-Type: application/json" \
-            -d '{"transition":{"id":"5"}}' \
-            "https://alumnos-team-myphxh4c.atlassian.net/rest/api/3/issue/${{ steps.jira_key.outputs.issue_key }}/transitions"
-
-      # --- PASO 3: NOTIFICA A DISCORD (TU CÓDIGO ORIGINAL) ---
       - name: Notificar commits a Discord
         run: |
           curl -H "Content-Type: application/json" \
           -d '{
             "embeds": [{
               "title": "🚀 Nuevo Commit en '"${{ github.repository }}"'",
-              "description": "**Rama:** `'"${{ github.ref_name }}"'`\n**Autor:** '"${{ github.actor }}"'\n**Mensaje:** '"${{ github.event.head_commit.message }}"'",
+              "description": "**Rama:** '"${{ github.ref_name }}"'\n**Autor:** '"${{ github.actor }}"'\n**Mensaje:** '"${{ github.event.head_commit.message }}"'",
               "color": 3447003,
               "url": "'"${{ github.event.head_commit.url }}"'",
               "footer": {
@@ -53,60 +27,12 @@ jobs:
             }]
           }' \
           ${{ secrets.DISCORD_WEBHOOK_COMMITS }}
-
   notify-pr:
     if: github.event_name == 'pull_request'
     runs-on: ubuntu-latest
     steps:
-      # --- PASO 1: EXTRAE LA CLAVE DE JIRA DEL TÍTULO DEL PR ---
-      - name: Extract Jira Issue Key
-        id: jira_key
-        run: |
-          ISSUE_KEY=$(echo "${{ github.event.pull_request.title }}" | grep -oE 'DES-[0-9]+' || echo "")
-          echo "issue_key=$ISSUE_KEY" >> $GITHUB_OUTPUT
-          if [ -n "$ISSUE_KEY" ]; then
-            echo "✅ Found Jira issue: $ISSUE_KEY"
-          else
-            echo "⚠️ No Jira issue key found in PR title"
-          fi
-
-      # --- PASO 2: MUEVE A "IN REVIEW" (PR ABIERTO) ---
-      - name: Move Jira issue to IN REVIEW
-        if: github.event.action == 'opened' && steps.jira_key.outputs.issue_key != ''
-        run: |
-          echo "Moving ${{ steps.jira_key.outputs.issue_key }} to IN REVIEW..."
-          curl -X POST \
-            -u "${{ secrets.JIRA_EMAIL }}:${{ secrets.JIRA_API_TOKEN }}" \
-            -H "Content-Type: application/json" \
-            -d '{"transition":{"id":"3"}}' \
-            "https://alumnos-team-myphxh4c.atlassian.net/rest/api/3/issue/${{ steps.jira_key.outputs.issue_key }}/transitions"
-
-      # --- PASO 3: MUEVE A "DONE" (PR MERGEADO) ---
-      - name: Move Jira issue to DONE
-        if: github.event.pull_request.merged == true && steps.jira_key.outputs.issue_key != ''
-        run: |
-          echo "Moving ${{ steps.jira_key.outputs.issue_key }} to DONE..."
-          curl -X POST \
-            -u "${{ secrets.JIRA_EMAIL }}:${{ secrets.JIRA_API_TOKEN }}" \
-            -H "Content-Type: application/json" \
-            -d '{"transition":{"id":"6"}}' \
-            "https://alumnos-team-myphxh4c.atlassian.net/rest/api/3/issue/${{ steps.jira_key.outputs.issue_key }}/transitions"
-
-      # --- PASO 4: MUEVE A "IN PROGRESS" (PR RECHAZADO) ---
-      - name: Move Jira issue back to IN PROGRESS (rejected)
-        if: github.event.action == 'closed' && github.event.pull_request.merged == false && steps.jira_key.outputs.issue_key != ''
-        run: |
-          echo "Moving ${{ steps.jira_key.outputs.issue_key }} back to IN PROGRESS (rejected)..."
-          curl -X POST \
-            -u "${{ secrets.JIRA_EMAIL }}:${{ secrets.JIRA_API_TOKEN }}" \
-            -H "Content-Type: application/json" \
-            -d '{"transition":{"id":"5"}}' \
-            "https://alumnos-team-myphxh4c.atlassian.net/rest/api/3/issue/${{ steps.jira_key.outputs.issue_key }}/transitions"
-
-      # --- PASO 5: NOTIFICA A DISCORD (TU CÓDIGO ORIGINAL) ---
       - name: Notificar PR a Discord
         run: |
-          # ... (tu script de notificación de PR se queda aquí igual) ...
           COLOR=15844367
           if [ "${{ github.event.action }}" = "closed" ] && [ "${{ github.event.pull_request.merged }}" = "true" ]; then
             COLOR=5763719
@@ -120,12 +46,12 @@ jobs:
           else
             ACTION_TEXT="${{ github.event.action }}"
           fi
-          
+
           curl -H "Content-Type: application/json" \
           -d '{
             "embeds": [{
               "title": "Pull Request '"$ACTION_TEXT"'",
-              "description": "**'"${{ github.event.pull_request.title }}"'**\n\n**Autor:** '"${{ github.event.pull_request.user.login }}"'\n**Rama:** `'"${{ github.event.pull_request.head.ref }}"'` → `'"${{ github.event.pull_request.base.ref }}"'`",
+              "description": "**'"${{ github.event.pull_request.title }}"'**\n\n**Autor:** '"${{ github.event.pull_request.user.login }}"'\n**Rama:** '"${{ github.event.pull_request.head.ref }}"' → '"${{ github.event.pull_request.base.ref }}"'",
               "color": '"$COLOR"',
               "url": "'"${{ github.event.pull_request.html_url }}"'",
               "footer": {
@@ -135,15 +61,12 @@ jobs:
             }]
           }' \
           ${{ secrets.DISCORD_WEBHOOK_PRS }}
-  
   notify-issue:
-    # ... (este job se queda exactamente igual) ...
     if: github.event_name == 'issues'
     runs-on: ubuntu-latest
     steps:
       - name: Notificar Issue a Discord
         run: |
-          # ... (tu script de notificación de issue se queda aquí igual) ...
           COLOR=16776960
           if [ "${{ github.event.action }}" = "opened" ]; then
             ACTION_TEXT="🐛 abierto"
@@ -154,7 +77,7 @@ jobs:
           else
             ACTION_TEXT="${{ github.event.action }}"
           fi
-          
+
           curl -H "Content-Type: application/json" \
           -d '{
             "embeds": [{
