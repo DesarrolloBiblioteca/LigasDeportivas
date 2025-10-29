@@ -1,37 +1,27 @@
-# Nombre del flujo de trabajo de CI (Pruebas)
-name: CI de DesarrolloBiblioteca
+name: Pipeline de CI (Construcción y Pruebas)
 
-# Cuándo se debe ejecutar
 on:
-  # Al hacer push a la rama 'master'
   push:
     branches: [ "master" ]
   # Al crear un Pull Request hacia 'master'
   pull_request:
     branches: [ "master" ]
 
-# Los trabajos (jobs) que se van a ejecutar
 jobs:
-  # El trabajo se llama "build-and-test"
-  build-and-test:
-    # Se ejecuta en una máquina virtual de Ubuntu
+  construir-y-probar:
     runs-on: ubuntu-latest
 
     steps:
-      # 1. Descarga tu código del repositorio
-      - name: Checkout del código
+      - name: 1. Descargar el código
         uses: actions/checkout@v4
 
-      # 2. Configura el entorno de Node.js (Vite usa Node)
-      - name: Configurar Node.js
+      - name: 2. Configurar el entorno de Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '20' # O la versión que estés usando
+          node-version: '20' 
 
-      # 3. Instala las dependencias (Este es el "Build")
-      - name: Instalar dependencias
+      - name: 3. Instalar dependencias (Build)
         run: npm install
 
-      # 4. Ejecuta las pruebas (Este es el "Test" de la Actividad 14)
-      - name: Ejecutar pruebas
+      - name: 4. Ejecutar pruebas (Test)
         run: npm test
