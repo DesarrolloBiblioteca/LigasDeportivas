@@ -10,6 +10,8 @@ const Formulario = ({ dispatch, contactoEditar, setContactoEditar }) => {
     imagen: "",
   });
 
+  //Aqui se desarrolla la funcion del update
+  //Update
   const [errores, setErrores] = useState({});
   const [previsualizacion, setPrevisualizacion] = useState("");
 
@@ -165,7 +167,7 @@ const Formulario = ({ dispatch, contactoEditar, setContactoEditar }) => {
   return (
     <div className="container my-3">
       <div className="card">
-        <div className="card-header bg-primary text-white">
+        <div className="card-header bg-danger text-white">
           <h4>{contactoEditar ? "Modificar Contacto" : "Agregar Contacto"}</h4>
         </div>
         <div className="card-body">
